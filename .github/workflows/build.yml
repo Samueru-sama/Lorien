@@ -53,6 +53,29 @@ jobs:
         run: | 
           cd lorien
           godot -v --export "Linux/X11" ../build/${EXPORT_NAME}_${LORIEN_VERSION}_Linux/${EXPORT_NAME}_${LORIEN_VERSION}.x86_64
+          # Prepare AppImage
+          cp -r ../build/${EXPORT_NAME}_${LORIEN_VERSION}_Linux lorien.AppDir
+          cd ./*AppDir && mkdir -p ./usr/share/applications && mkdir -p ./usr/bin
+          mv Lorien* ./usr/bin && mv ./usr/bin/Lorien*64 ./usr/bin/Lorien
+          DESKTOP="https://raw.githubusercontent.com/mbrlabs/Lorien/main/public/linux/com.github.mbrlabs.Lorien.desktop"
+          ICON="https://raw.githubusercontent.com/mbrlabs/Lorien/main/art/logo.svg"
+          wget -q "$DESKTOP" -O ./usr/share/applications/com.github.mbrlabs.Lorien.desktop || exit 1
+          wget -q "$ICON" -O ./com.github.mbrlabs.Lorien.svg || exit 1
+          ln -s usr/share/applications/*desktop ./ && ln -s ./*.svg ./.DirIcon || exit 1
+          printf '#!/bin/sh\nCURRENTDIR="$(readlink -f "$(dirname "$0")")"\n' > ./AppRun
+          printf 'exec "$CURRENTDIR"/usr/bin/Lorien "$@"\n' >> ./AppRun
+          chmod a+x ./AppRun
+
+          # Make AppImage
+          cd ..
+          APPIMAGETOOL=$(wget -q https://api.github.com/repos/probonopd/go-appimage/releases -O - \
+          | sed 's/[()",{} ]/\n/g' | grep -oi 'https.*continuous.*tool.*86_64.*mage$')
+          export ARCH=x86_64
+          export VERSION=${{ env.LORIEN_VERSION }}
+          wget -q "$APPIMAGETOOL" -O ./appimagetool && chmod a+x ./appimagetool || exit 1
+          ./appimagetool -s ./*.AppDir --appimage-extract-and-run || exit 1
+          mv *AppImage ../build/${EXPORT_NAME}_${LORIEN_VERSION}_Linux/${EXPORT_NAME}_${LORIEN_VERSION}.x86_64.AppImage
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
